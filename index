@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Сбор контактов по районам</title>
+<style>
+  :root{
+    --paper:#f6f1e6;
+    --paper2:#efe6d4;
+    --paper3:#e8dcc4;
+    --ink:#2b2620;
+    --ink-soft:#7a6f5c;
+    --ink-faint:#a89d87;
+    --line:#d6c9a8;
+    --red:#a8402a;
+    --green:#4a5d3a;
+    --serif:Georgia,'Times New Roman',serif;
+    --mono:'Courier New',Courier,monospace;
+    --sans:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);padding:20px 16px 60px;
+  }
+  .wrap{max-width:680px;margin:0 auto;}
+
+  .masthead{
+    border-bottom:3px double var(--ink);padding-bottom:12px;margin-bottom:18px;
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;
+  }
+  .masthead h1{font-family:var(--serif);font-size:20px;font-weight:700;margin:0;}
+  .sync-line{font-family:var(--mono);font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(74,93,58,.5);animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,93,58,.4);}70%{box-shadow:0 0 0 5px rgba(74,93,58,0);}100%{box-shadow:0 0 0 0 rgba(74,93,58,0);}}
+  .sync-dot.syncing{background:#a67c2e;animation:none;}
+
+  input,textarea,select{
+    font-family:var(--sans);background:var(--paper);border:1px solid var(--line);
+    color:var(--ink);border-radius:3px;padding:9px 10px;font-size:14px;outline:none;width:100%;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--ink);}
+  textarea{resize:vertical;min-height:60px;line-height:1.5;}
+
+  .btn{
+    background:var(--red);border:1px solid var(--red);color:#fff;
+    padding:10px 16px;border-radius:3px;font-size:13.5px;font-weight:700;cursor:pointer;
+    font-family:var(--sans);
+  }
+  .btn:hover{background:#8a3320;}
+  .btn-ghost{background:var(--paper);border:1px solid var(--ink);color:var(--ink);}
+  .btn-ghost:hover{background:var(--ink);color:var(--paper);}
+  .btn-block{width:100%;}
+  .btn-sm{padding:6px 10px;font-size:12px;}
+
+  /* Area picker */
+  .area-picker{
+    background:var(--paper2);border:1px dashed var(--line);border-radius:6px;
+    padding:14px 16px;margin-bottom:20px;
+  }
+  .area-picker label{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;}
+  .area-row{display:flex;gap:8px;}
+  .area-row select{flex:1;}
+
+  .new-area-form{display:none;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .new-area-form.open{display:flex;}
+  .new-area-form input{flex:1;min-width:120px;}
+
+  /* Current area header */
+  .current-area{
+    display:none;align-items:center;justify-content:space-between;
+    margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--ink);flex-wrap:wrap;gap:8px;
+  }
+  .current-area.show{display:flex;}
+  .current-area h2{font-family:var(--serif);font-size:19px;margin:0;}
+  .current-area h2 .city{color:var(--red);}
+  .current-area h2 .sep{color:var(--ink-faint);font-weight:400;margin:0 5px;}
+  .current-area .count{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
+  .current-area .right{display:flex;align-items:center;gap:10px;}
+  .area-actions{display:flex;gap:4px;}
+
+  .edit-area-form{
+    display:none;gap:8px;margin-bottom:14px;flex-wrap:wrap;
+    background:var(--paper2);border:1px dashed var(--line);border-radius:6px;padding:12px 14px;
+  }
+  .edit-area-form.open{display:flex;}
+  .edit-area-form input{flex:1;min-width:120px;}
+  .edit-area-form .actions{display:flex;gap:8px;}
+
+  /* Add contact block */
+  .add-contact{
+    display:none;background:var(--paper2);border:1px dashed var(--line);border-radius:6px;
+    padding:14px 16px;margin-bottom:18px;
+  }
+  .add-contact.show{display:block;}
+  .field{margin-bottom:9px;}
+  .field label{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;}
+
+  .contacts{display:flex;flex-direction:column;gap:10px;}
+  .contact-card{
+    background:var(--paper);border:1px solid var(--ink);border-radius:2px;
+    padding:12px 14px;box-shadow:3px 3px 0 var(--paper3);
+  }
+  .contact-text{font-size:14px;line-height:1.5;white-space:pre-wrap;margin-bottom:6px;}
+  .contact-comment{
+    font-size:12.5px;color:var(--ink-soft);font-style:italic;
+    padding:8px 10px;background:var(--paper2);border-radius:3px;border:1px dashed var(--line);margin-bottom:6px;
+  }
+  .contact-footer{display:flex;justify-content:flex-end;gap:6px;}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:14px;padding:2px 6px;}
+  .icon-btn:hover{color:var(--ink);}
+
+  .empty-state{text-align:center;padding:36px 20px;color:var(--ink-faint);font-family:var(--serif);font-size:14px;border:1px dashed var(--line);border-radius:4px;}
+  .no-area-hint{text-align:center;padding:36px 20px;color:var(--ink-faint);font-family:var(--serif);font-size:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <h1>Сбор контактов по районам</h1>
+    <div class="sync-line"><span class="sync-dot" id="syncDot"></span><span id="syncText">записано</span></div>
+  </div>
+
+  <div class="area-picker">
+    <label>Район работы</label>
+    <div class="area-row">
+      <select id="areaSelect"><option value="">— выбрать район —</option></select>
+      <button class="btn-ghost btn btn-sm" id="newAreaToggle">+ Новый район</button>
+    </div>
+    <div class="new-area-form" id="newAreaForm">
+      <input type="text" id="newCity" placeholder="Город">
+      <input type="text" id="newDistrict" placeholder="Район">
+      <button class="btn btn-sm" id="createAreaBtn">Создать</button>
+    </div>
+  </div>
+
+  <div class="current-area" id="currentAreaHeader">
+    <h2><span class="city" id="curCity"></span><span class="sep">/</span><span id="curDistrict"></span></h2>
+    <div class="right">
+      <span class="count" id="curCount"></span>
+      <div class="area-actions">
+        <button class="icon-btn" id="editAreaToggle" title="Редактировать район">✎</button>
+        <button class="icon-btn" id="deleteAreaBtn" title="Удалить район">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="edit-area-form" id="editAreaForm">
+    <input type="text" id="editCity" placeholder="Город">
+    <input type="text" id="editDistrict" placeholder="Район">
+    <div class="actions">
+      <button class="btn btn-sm" id="saveAreaEditBtn">Сохранить</button>
+      <button class="btn-ghost btn btn-sm" id="cancelAreaEditBtn">Отмена</button>
+    </div>
+  </div>
+
+  <div class="add-contact" id="addContactBlock">
+    <div class="field">
+      <label>Контакт</label>
+      <textarea id="fContact" placeholder="ул. Ленина 12, кофейня — Иванов Иван, +7 900 000-00-00"></textarea>
+    </div>
+    <div class="field">
+      <label>Комментарий</label>
+      <textarea id="fComment" placeholder="напр. перезвонить после 18:00, интересует аренда" style="min-height:44px;"></textarea>
+    </div>
+    <button class="btn btn-block" id="addContactBtn">Добавить контакт</button>
+  </div>
+
+  <div class="contacts" id="contactsList"></div>
+  <div class="no-area-hint" id="noAreaHint">Выберите или создайте район выше, чтобы начать добавлять контакты.</div>
+
+</div>
+
+<script>
+const AREAS_KEY = 'sbor_areas_v1';
+const CONTACTS_KEY = 'sbor_area_contacts_v1';
+
+let areas = [];
+let contacts = [];
+let currentAreaId = null;
+let editingId = null;
+let syncing = false;
+
+// fallback: what to return if the request fails for a reason OTHER than
+// "key doesn't exist yet" — prevents a transient network hiccup from being
+// mistaken for "no data" and wiping out everything on the next save.
+async function fetchData(key, fallback){
+  try{
+    const r = await window.storage.get(key, true);
+    if(!r || !r.value) return [];
+    return JSON.parse(r.value);
+  } catch(e){
+    console.warn('storage read failed for', key, e);
+    return fallback !== undefined ? fallback : [];
+  }
+}
+async function saveData(key, arr){
+  try{ await window.storage.set(key, JSON.stringify(arr), true); return true; }
+  catch(e){ console.error('storage error', e); return false; }
+}
+function setSyncing(state){
+  syncing = state;
+  const dot = document.getElementById('syncDot'), txt = document.getElementById('syncText');
+  if(state){ dot.classList.add('syncing'); txt.textContent = 'запись...'; }
+  else{ dot.classList.remove('syncing'); txt.textContent = 'записано · ' + new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }
+}
+async function loadAll(){
+  const [a,c] = await Promise.all([fetchData(AREAS_KEY), fetchData(CONTACTS_KEY)]);
+  areas = a; contacts = c;
+  renderAreaSelect();
+  renderCurrentArea();
+}
+setInterval(async ()=>{
+  if(syncing) return;
+  // pass current state as fallback: if this poll's read fails, keep showing
+  // what we already have instead of blanking the screen
+  const [a,c] = await Promise.all([fetchData(AREAS_KEY, areas), fetchData(CONTACTS_KEY, contacts)]);
+  areas = a; contacts = c;
+  renderAreaSelect();
+  renderCurrentArea();
+  setSyncing(false);
+}, 7000);
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// ---------- Areas ----------
+async function createArea(city, district){
+  setSyncing(true);
+  const fresh = await fetchData(AREAS_KEY, areas);
+  const existing = fresh.find(a=>a.city.toLowerCase()===city.toLowerCase() && a.district.toLowerCase()===district.toLowerCase());
+  if(existing){
+    areas = fresh;
+    setSyncing(false);
+    return existing.id;
+  }
+  const obj = { id: 'a_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), city, district, createdAt: Date.now() };
+  fresh.push(obj);
+  await saveData(AREAS_KEY, fresh);
+  areas = fresh;
+  setSyncing(false);
+  return obj.id;
+}
+async function updateArea(id, city, district){
+  setSyncing(true);
+  const fresh = await fetchData(AREAS_KEY, areas);
+  const idx = fresh.findIndex(a=>a.id===id);
+  if(idx>-1) fresh[idx] = {...fresh[idx], city, district};
+  await saveData(AREAS_KEY, fresh);
+  areas = fresh;
+  setSyncing(false);
+}
+async function deleteArea(id){
+  setSyncing(true);
+  const freshAreas = await fetchData(AREAS_KEY, areas);
+  const idx = freshAreas.findIndex(a=>a.id===id);
+  if(idx>-1) freshAreas.splice(idx,1);
+  await saveData(AREAS_KEY, freshAreas);
+  areas = freshAreas;
+
+  const freshContacts = await fetchData(CONTACTS_KEY, contacts);
+  const remaining = freshContacts.filter(c=>c.areaId!==id);
+  await saveData(CONTACTS_KEY, remaining);
+  contacts = remaining;
+
+  setSyncing(false);
+}
+
+function renderAreaSelect(){
+  const sel = document.getElementById('areaSelect');
+  const cur = currentAreaId;
+  const sorted = [...areas].sort((a,b)=>a.city.localeCompare(b.city)||a.district.localeCompare(b.district));
+  sel.innerHTML = '<option value="">— выбрать район —</option>' +
+    sorted.map(a=>`<option value="${a.id}">${escapeHtml(a.city)} / ${escapeHtml(a.district)}</option>`).join('');
+  sel.value = cur || '';
+}
+document.getElementById('areaSelect').addEventListener('change', (e)=>{
+  currentAreaId = e.target.value || null;
+  renderCurrentArea();
+});
+
+document.getElementById('newAreaToggle').addEventListener('click', ()=>{
+  document.getElementById('newAreaForm').classList.toggle('open');
+});
+document.getElementById('createAreaBtn').addEventListener('click', async ()=>{
+  const city = document.getElementById('newCity').value.trim();
+  const district = document.getElementById('newDistrict').value.trim();
+  if(!city || !district){ alert('Укажите город и район'); return; }
+  const id = await createArea(city, district);
+  document.getElementById('newCity').value = '';
+  document.getElementById('newDistrict').value = '';
+  document.getElementById('newAreaForm').classList.remove('open');
+  currentAreaId = id;
+  renderAreaSelect();
+  renderCurrentArea();
+});
+
+document.getElementById('editAreaToggle').addEventListener('click', ()=>{
+  const area = areas.find(a=>a.id===currentAreaId);
+  if(!area) return;
+  document.getElementById('editCity').value = area.city;
+  document.getElementById('editDistrict').value = area.district;
+  document.getElementById('editAreaForm').classList.add('open');
+});
+document.getElementById('cancelAreaEditBtn').addEventListener('click', ()=>{
+  document.getElementById('editAreaForm').classList.remove('open');
+});
+document.getElementById('saveAreaEditBtn').addEventListener('click', async ()=>{
+  const city = document.getElementById('editCity').value.trim();
+  const district = document.getElementById('editDistrict').value.trim();
+  if(!city || !district){ alert('Укажите город и район'); return; }
+  await updateArea(currentAreaId, city, district);
+  document.getElementById('editAreaForm').classList.remove('open');
+  renderAreaSelect();
+  renderCurrentArea();
+});
+document.getElementById('deleteAreaBtn').addEventListener('click', async ()=>{
+  const area = areas.find(a=>a.id===currentAreaId);
+  if(!area) return;
+  const areaContactsCount = contacts.filter(c=>c.areaId===currentAreaId).length;
+  const msg = areaContactsCount>0
+    ? `Удалить район «${area.city} / ${area.district}»? Вместе с ним будет удалено ${areaContactsCount} контактов.`
+    : `Удалить район «${area.city} / ${area.district}»?`;
+  if(!confirm(msg)) return;
+  await deleteArea(currentAreaId);
+  currentAreaId = null;
+  document.getElementById('editAreaForm').classList.remove('open');
+  renderAreaSelect();
+  renderCurrentArea();
+});
+
+// ---------- Contacts ----------
+async function addContact(areaId, contactText, comment){
+  setSyncing(true);
+  const fresh = await fetchData(CONTACTS_KEY, contacts);
+  fresh.push({
+    id: 'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    areaId, contact: contactText, comment, createdAt: Date.now()
+  });
+  await saveData(CONTACTS_KEY, fresh);
+  contacts = fresh;
+  renderCurrentArea();
+  setSyncing(false);
+}
+async function updateContact(id, patch){
+  setSyncing(true);
+  const fresh = await fetchData(CONTACTS_KEY, contacts);
+  const idx = fresh.findIndex(c=>c.id===id);
+  if(idx>-1) fresh[idx] = {...fresh[idx], ...patch};
+  await saveData(CONTACTS_KEY, fresh);
+  contacts = fresh;
+  renderCurrentArea();
+  setSyncing(false);
+}
+async function deleteContact(id){
+  setSyncing(true);
+  const fresh = await fetchData(CONTACTS_KEY, contacts);
+  const idx = fresh.findIndex(c=>c.id===id);
+  if(idx>-1) fresh.splice(idx,1);
+  await saveData(CONTACTS_KEY, fresh);
+  contacts = fresh;
+  renderCurrentArea();
+  setSyncing(false);
+}
+window.startEditContact = (id)=>{
+  const c = contacts.find(x=>x.id===id);
+  if(!c) return;
+  editingId = id;
+  document.getElementById('fContact').value = c.contact||'';
+  document.getElementById('fComment').value = c.comment||'';
+  document.getElementById('addContactBtn').textContent = 'Сохранить изменения';
+  window.scrollTo({top:0, behavior:'smooth'});
+};
+window.removeContact = async (id)=>{ if(confirm('Удалить контакт?')){ await deleteContact(id); } };
+
+document.getElementById('addContactBtn').addEventListener('click', async ()=>{
+  if(!currentAreaId){ alert('Сначала выберите район'); return; }
+  const contactText = document.getElementById('fContact').value.trim();
+  const comment = document.getElementById('fComment').value.trim();
+  if(!contactText){ alert('Заполните поле контакта'); return; }
+
+  if(editingId){
+    await updateContact(editingId, {contact: contactText, comment});
+    editingId = null;
+    document.getElementById('addContactBtn').textContent = 'Добавить контакт';
+  } else {
+    await addContact(currentAreaId, contactText, comment);
+  }
+  document.getElementById('fContact').value = '';
+  document.getElementById('fComment').value = '';
+});
+
+function renderCurrentArea(){
+  document.getElementById('editAreaForm').classList.remove('open');
+  const header = document.getElementById('currentAreaHeader');
+  const addBlock = document.getElementById('addContactBlock');
+  const noAreaHint = document.getElementById('noAreaHint');
+  const list = document.getElementById('contactsList');
+
+  if(!currentAreaId){
+    header.classList.remove('show');
+    addBlock.classList.remove('show');
+    noAreaHint.style.display = 'block';
+    list.innerHTML = '';
+    return;
+  }
+  const area = areas.find(a=>a.id===currentAreaId);
+  if(!area){
+    currentAreaId = null;
+    renderCurrentArea();
+    return;
+  }
+  noAreaHint.style.display = 'none';
+  header.classList.add('show');
+  addBlock.classList.add('show');
+  document.getElementById('curCity').textContent = area.city;
+  document.getElementById('curDistrict').textContent = area.district;
+
+  const areaContacts = contacts.filter(c=>c.areaId===currentAreaId).sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('curCount').textContent = areaContacts.length + (areaContacts.length===1 ? ' контакт' : ' контактов');
+
+  if(areaContacts.length===0){
+    list.innerHTML = '<div class="empty-state">Пока нет ни одного контакта в этом районе.</div>';
+    return;
+  }
+  list.innerHTML = areaContacts.map(c=>`
+    <div class="contact-card">
+      <div class="contact-text">${escapeHtml(c.contact)}</div>
+      ${c.comment ? `<div class="contact-comment">${escapeHtml(c.comment)}</div>` : ''}
+      <div class="contact-footer">
+        <button class="icon-btn" onclick="startEditContact('${c.id}')" title="Редактировать">✎</button>
+        <button class="icon-btn" onclick="removeContact('${c.id}')" title="Удалить">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+loadAll();
+</script>
+</body>
+</html>
